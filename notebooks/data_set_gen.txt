@@ -1,26 +1,46 @@
+# =============================================================================
+# Dataset rebuild commands for the consolidated Econ_Runs / QoL_Runs layout.
+# =============================================================================
+#
+# PREREQUISITES
+# 1. RL config YAMLs copied into each run root's configs/ dir (use
+#    jobs/migrate_configs.sh; QoL configs get the rcp token so CONFIG==BUFFER_NAME):
+#      /home/projects/dtu_00074/scratch/ritsar/Econ_Runs/configs/*.yaml
+#      /home/projects/dtu_00074/scratch/ritsar/QoL_Runs/configs/*.yaml
+# 2. jobs/build_dataset.pbs must bind the new scratch location so /mnt/ritsar
+#    resolves inside the container. Add (or replace the old ritsar_code bind):
+#      --bind /home/projects/dtu_00074/scratch/ritsar:/mnt/ritsar:ro
+# 3. Run from the new PROJECT_ROOT: /home/projects/dtu_00074/scratch/ritsar/Surrogate
+#
+# NOTE: these use jobs/build_dataset.pbs (src.build_dataset_multi), which accepts
+# comma-separated BUFFER_NAME/CONFIG for combined datasets. A single RAW_DIR is
+# broadcast to every source because all scenarios now share one cache/.
 
+# ---- Econ ------------------------------------------------------------------
+OBJECTIVE=Econ FOLDER_NAME=econ_rf_2 BUFFER_NAME=economic_rf_2_cph CONFIG=economic_rf_2_cph RAW_DIR=/mnt/ritsar/Econ_Runs qsub -v OBJECTIVE,FOLDER_NAME,BUFFER_NAME,CONFIG,RAW_DIR jobs/build_dataset.pbs
 
-qsub -v  OBJECTIVE="Econ",FOLDER_NAME="econ_rf_2",BUFFER_NAME="economic_rf_2_cph",CONFIG="conomic_rf_2_cph",RAW_DIR=/home/projects/dtu_00074/scratch/ritsar_code/fullcopenhagen  scripts/build_dataset.pbs
+OBJECTIVE=Econ FOLDER_NAME=econ_rcp_26 BUFFER_NAME=economic_StorKbh_rcp26 CONFIG=economic_cph_rcp26 RAW_DIR=/mnt/ritsar/Econ_Runs qsub -v OBJECTIVE,FOLDER_NAME,BUFFER_NAME,CONFIG,RAW_DIR jobs/build_dataset.pbs
 
+OBJECTIVE=Econ FOLDER_NAME=econ_rcp_45 BUFFER_NAME=economic_StorKbh_rcp45 CONFIG=economic_chp_rcp45 RAW_DIR=/mnt/ritsar/Econ_Runs qsub -v OBJECTIVE,FOLDER_NAME,BUFFER_NAME,CONFIG,RAW_DIR jobs/build_dataset.pbs
 
-qsub -v  OBJECTIVE="Econ",FOLDER_NAME="econ_rcp_45",BUFFER_NAME="economic_rf_2_cph_rcp45",CONFIG="economic_chp_rcp45",RAW_DIR=/home/projects/dtu_00074/scratch/ritsar_code/fullcopenhagen  scripts/build_dataset.pbs
+OBJECTIVE=Econ FOLDER_NAME=econ_rcp_85 BUFFER_NAME=economic_StorKbh_rcp85 CONFIG=economic_cph_rcp85 RAW_DIR=/mnt/ritsar/Econ_Runs qsub -v OBJECTIVE,FOLDER_NAME,BUFFER_NAME,CONFIG,RAW_DIR jobs/build_dataset.pbs
 
+OBJECTIVE=Econ FOLDER_NAME=econ_combined BUFFER_NAME='economic_StorKbh_rcp26,economic_StorKbh_rcp45,economic_StorKbh_rcp85' CONFIG='economic_cph_rcp26,economic_chp_rcp45,economic_cph_rcp85' RAW_DIR=/mnt/ritsar/Econ_Runs qsub -v OBJECTIVE,FOLDER_NAME,BUFFER_NAME,CONFIG,RAW_DIR jobs/build_dataset.pbs
 
+# ---- QoL (single) ----------------------------------------------------------
+OBJECTIVE=QoL FOLDER_NAME=qol_rcp_26 BUFFER_NAME=qol_StorKbh_rcp_26_10_env CONFIG=qol_StorKbh_rcp_26_10_env RAW_DIR=/mnt/ritsar/QoL_Runs qsub -v OBJECTIVE,FOLDER_NAME,BUFFER_NAME,CONFIG,RAW_DIR jobs/build_dataset.pbs
 
-OBJECTIVE='Econ' FOLDER_NAME='econ_combined' BUFFER_NAME='economic_rf_2_cph_rcp26,economic_rf_2_cph_rcp45,economic_rf_2_cph_rcp85' CONFIG='economic_cph_rcp26,economic_chp_rcp45,economic_cph_rcp85' RAW_DIR='/home/projects/dtu_00074/scratch/ritsar_code/fullcopenhagen' qsub -v OBJECTIVE,FOLDER_NAME,BUFFER_NAME,CONFIG,RAW_DIR     scripts/build_dataset_multi_source_balanced.pbs
+OBJECTIVE=QoL FOLDER_NAME=qol_rcp_45 BUFFER_NAME=qol_StorKbh_rcp_45_10_env CONFIG=qol_StorKbh_rcp_45_10_env RAW_DIR=/mnt/ritsar/QoL_Runs qsub -v OBJECTIVE,FOLDER_NAME,BUFFER_NAME,CONFIG,RAW_DIR jobs/build_dataset.pbs
 
+OBJECTIVE=QoL FOLDER_NAME=qol_rcp_85 BUFFER_NAME=qol_StorKbh_rcp_85_10_env CONFIG=qol_StorKbh_rcp_85_10_env RAW_DIR=/mnt/ritsar/QoL_Runs qsub -v OBJECTIVE,FOLDER_NAME,BUFFER_NAME,CONFIG,RAW_DIR jobs/build_dataset.pbs
 
+# ---- QoL (combined) --------------------------------------------------------
+OBJECTIVE=QoL FOLDER_NAME=qol_rcp_26_combined BUFFER_NAME='qol_StorKbh_rcp_26_10_env,qol_StorKbh_rcp_26_1_env,qol_StorKbh_rcp_26_2_env,qol_StorKbh_rcp_26_5_env' CONFIG='qol_StorKbh_rcp_26_10_env,qol_StorKbh_rcp_26_1_env,qol_StorKbh_rcp_26_2_env,qol_StorKbh_rcp_26_5_env' RAW_DIR=/mnt/ritsar/QoL_Runs qsub -v OBJECTIVE,FOLDER_NAME,BUFFER_NAME,CONFIG,RAW_DIR jobs/build_dataset.pbs
 
- OBJECTIVE='QoL' FOLDER_NAME='qol_rcp_26_combined' BUFFER_NAME='qol_StorKbh_10_env_rcp_26,qol_StorKbh_1_env_rcp_26,qol_StorKbh_2_env_rcp_26,qol_StorKbh_5_env_rcp_26' CONFIG='qol_StorKbh_10_env,qol_StorKbh_1_env,qol_StorKbh_2_env,qol_StorKbh_5_env' RAW_DIR='/home/projects/dtu_00074/scratch/ritsar_code/QoL_StorKbh_v4' qsub -v OBJECTIVE,FOLDER_NAME,BUFFER_NAME,CONFIG,RAW_DIR     scripts/build_dataset_multi_source_balanced.pbs
+OBJECTIVE=QoL FOLDER_NAME=qol_rcp_45_combined BUFFER_NAME='qol_StorKbh_rcp_45_10_env,qol_StorKbh_rcp_45_1_env,qol_StorKbh_rcp_45_2_env,qol_StorKbh_rcp_45_5_env' CONFIG='qol_StorKbh_rcp_45_10_env,qol_StorKbh_rcp_45_1_env,qol_StorKbh_rcp_45_2_env,qol_StorKbh_rcp_45_5_env' RAW_DIR=/mnt/ritsar/QoL_Runs qsub -v OBJECTIVE,FOLDER_NAME,BUFFER_NAME,CONFIG,RAW_DIR jobs/build_dataset.pbs
 
- OBJECTIVE='QoL' FOLDER_NAME='qol_rcp_45_combined' BUFFER_NAME='qol_StorKbh_10_env,qol_StorKbh_1_env,qol_StorKbh_2_env,qol_StorKbh_5_env' CONFIG='qol_StorKbh_10_env,qol_StorKbh_1_env,qol_StorKbh_2_env,qol_StorKbh_5_env' RAW_DIR='/home/projects/dtu_00074/scratch/ritsar_code/QoL_StorKbh_v3' qsub -v OBJECTIVE,FOLDER_NAME,BUFFER_NAME,CONFIG,RAW_DIR     scripts/build_dataset_multi_source_balanced.pbs
+OBJECTIVE=QoL FOLDER_NAME=qol_rcp_85_combined BUFFER_NAME='qol_StorKbh_rcp_85_10_env,qol_StorKbh_rcp_85_1_env,qol_StorKbh_rcp_85_2_env,qol_StorKbh_rcp_85_5_env' CONFIG='qol_StorKbh_rcp_85_10_env,qol_StorKbh_rcp_85_1_env,qol_StorKbh_rcp_85_2_env,qol_StorKbh_rcp_85_5_env' RAW_DIR=/mnt/ritsar/QoL_Runs qsub -v OBJECTIVE,FOLDER_NAME,BUFFER_NAME,CONFIG,RAW_DIR jobs/build_dataset.pbs
 
- OBJECTIVE='QoL' FOLDER_NAME='qol_rcp_85_combined' BUFFER_NAME='qol_StorKbh_10_env_rcp_85,qol_StorKbh_1_env_rcp_85,qol_StorKbh_2_env_rcp_85,qol_StorKbh_5_env_rcp_85' CONFIG='qol_StorKbh_10_env,qol_Sto
-rKbh_1_env,qol_StorKbh_2_env,qol_StorKbh_5_env' RAW_DIR='/home/projects/dtu_
-00074/scratch/ritsar_code/QoL_StorKbh_v5' qsub -v OBJECTIVE,FOLDER_NAME,BUFF
-ER_NAME,CONFIG,RAW_DIR     scripts/build_dataset_multi_source_balanced.pbs
+OBJECTIVE=QoL FOLDER_NAME=qol_combined BUFFER_NAME='qol_StorKbh_rcp_26_10_env,qol_StorKbh_rcp_45_10_env,qol_StorKbh_rcp_85_10_env' CONFIG='qol_StorKbh_rcp_26_10_env,qol_StorKbh_rcp_45_10_env,qol_StorKbh_rcp_85_10_env' RAW_DIR=/mnt/ritsar/QoL_Runs qsub -v OBJECTIVE,FOLDER_NAME,BUFFER_NAME,CONFIG,RAW_DIR jobs/build_dataset.pbs
 
-OBJECTIVE='QoL' FOLDER_NAME='qol_combined' BUFFER_NAME='qol_StorKbh_10_env_rcp_26,qol_StorKbh_10_env,qol_StorKbh_10_env_rcp_85' CONFIG='qol_StorKbh_10_env,qol_StorKbh_10_env,qol_StorKbh_10_env' RAW_DIR='/home/projects/dtu_00074/scratch/ritsar_code/QoL_StorKbh_v4,/home/projects/dtu_00074/scratch/ritsar_code/QoL_StorKbh_v3,/home/projects/dtu_00074/scratch/ritsar_code/QoL_StorKbh_v5' qsub -v OBJECTIVE,FOLDER_NAME,BUFFER_NAME,CONFIG,RAW_DIR     scripts/build_dataset_multi_source_balanced.pbs
-
-
-OBJECTIVE='QoL' FOLDER_NAME='qol_jumbo' BUFFER_NAME='qol_StorKbh_10_env_rcp_85,qol_StorKbh_1_env_rcp_85,qol_StorKbh_2_env_rcp_85,qol_StorKbh_5_env_rcp_85,qol_StorKbh_10_env_rcp_26,qol_StorKbh_1_env_rcp_26,qol_StorKbh_2_env_rcp_26,qol_StorKbh_5_env_rcp_26,qol_StorKbh_10_env,qol_StorKbh_1_env,qol_StorKbh_2_env,qol_StorKbh_5_env' CONFIG='qol_StorKbh_10_env,qol_StorKbh_1_env,qol_StorKbh_2_env,qol_StorKbh_5_env,qol_StorKbh_10_env,qol_StorKbh_1_env,qol_StorKbh_2_env,qol_StorKbh_5_env,qol_StorKbh_10_env,qol_StorKbh_1_env,qol_StorKbh_2_env,qol_StorKbh_5_env' RAW_DIR='/home/projects/dtu_00074/scratch/ritsar_code/QoL_StorKbh_v5,/home/projects/dtu_00074/scratch/ritsar_code/QoL_StorKbh_v5,/home/projects/dtu_00074/scratch/ritsar_code/QoL_StorKbh_v5,/home/projects/dtu_00074/scratch/ritsar_code/QoL_StorKbh_v5,/home/projects/dtu_00074/scratch/ritsar_code/QoL_StorKbh_v4,/home/projects/dtu_00074/scratch/ritsar_code/QoL_StorKbh_v4,/home/projects/dtu_00074/scratch/ritsar_code/QoL_StorKbh_v4,/home/projects/dtu_00074/scratch/ritsar_code/QoL_StorKbh_v4,/home/projects/dtu_00074/scratch/ritsar_code/QoL_StorKbh_v3,/home/projects/dtu_00074/scratch/ritsar_code/QoL_StorKbh_v3,/home/projects/dtu_00074/scratch/ritsar_code/QoL_StorKbh_v3,/home/projects/dtu_00074/scratch/ritsar_code/QoL_StorKbh_v3' qsub -v OBJECTIVE,FOLDER_NAME,BUFFER_NAME,CONFIG,RAW_DIR     scripts/build_dataset_multi_source_balanced.pbs
+OBJECTIVE=QoL FOLDER_NAME=qol_jumbo BUFFER_NAME='qol_StorKbh_rcp_85_10_env,qol_StorKbh_rcp_85_1_env,qol_StorKbh_rcp_85_2_env,qol_StorKbh_rcp_85_5_env,qol_StorKbh_rcp_26_10_env,qol_StorKbh_rcp_26_1_env,qol_StorKbh_rcp_26_2_env,qol_StorKbh_rcp_26_5_env,qol_StorKbh_rcp_45_10_env,qol_StorKbh_rcp_45_1_env,qol_StorKbh_rcp_45_2_env,qol_StorKbh_rcp_45_5_env' CONFIG='qol_StorKbh_rcp_85_10_env,qol_StorKbh_rcp_85_1_env,qol_StorKbh_rcp_85_2_env,qol_StorKbh_rcp_85_5_env,qol_StorKbh_rcp_26_10_env,qol_StorKbh_rcp_26_1_env,qol_StorKbh_rcp_26_2_env,qol_StorKbh_rcp_26_5_env,qol_StorKbh_rcp_45_10_env,qol_StorKbh_rcp_45_1_env,qol_StorKbh_rcp_45_2_env,qol_StorKbh_rcp_45_5_env' RAW_DIR=/mnt/ritsar/QoL_Runs qsub -v OBJECTIVE,FOLDER_NAME,BUFFER_NAME,CONFIG,RAW_DIR jobs/build_dataset.pbs

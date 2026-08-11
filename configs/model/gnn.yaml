@@ -1,0 +1,71 @@
+family: GNN
+
+# Graph neural network over the region adjacency graph.
+#
+# Each sample is stored per-region (x[num_regions, x_node_width],
+# y[num_regions, y_width]) and flattened region-major by the training layer. The
+# surrogate reshapes the flat vector back to per-node features, runs message
+# passing over the region graph, and flattens the per-node predictions back to the
+# target layout, so it plugs into the shared training loop / standardizer /
+# metrics exactly like the MLP.
+#
+# Adjacency source (resolved relative to PROJECT_ROOT, then the dataset dir):
+#   graph_file  configs/graph/region_graph.yaml
+#     A consolidated YAML with `nodes` (ordered list of {id, name}; list position
+#     is the node index / x/y matrix row order) and `edges` (a COO edge list of
+#     region ids {source: [...], target: [...]}). Regenerate it from the legacy
+#     graph_adj.txt / node_mapping.txt / geodata_dict.txt sources with
+#     `python tools/convert_graph_to_yaml.py`.
+# This file must be synced to the cluster alongside the project. The edge list
+# is also persisted inside each checkpoint, so a saved model reloads without it.
+#
+# conv_type:
+#   gcn   -> symmetric-normalized D^-1/2 (A+I) D^-1/2 propagation.
+#   sage  -> GraphSAGE mean: separate self and neighbour-mean transforms.
+# No torch_geometric dependency: message passing is a dense [N, N] matmul, which
+# is inexpensive for the ~278 regions here. CPU-only cluster friendly.
+profiles:
+  small_gnn:
+    hidden_dim: 64
+    num_layers: 2
+    dropout: 0.05
+    activation: gelu
+    conv_type: gcn
+    residual: true
+    layer_norm: true
+    add_self_loops: true
+    undirected: true
+
+  medium_gnn:
+    hidden_dim: 128
+    num_layers: 3
+    dropout: 0.1
+    activation: gelu
+    conv_type: gcn
+    residual: true
+    layer_norm: true
+    add_self_loops: true
+    undirected: true
+
+  deep_gnn:
+    hidden_dim: 192
+    num_layers: 5
+    dropout: 0.1
+    activation: gelu
+    conv_type: gcn
+    residual: true
+    layer_norm: true
+    add_self_loops: true
+    undirected: true
+
+  # GraphSAGE mean-aggregation variant: keeps the self signal separate from the
+  # neighbour mean, which can help when node features are informative on their own.
+  sage_gnn:
+    hidden_dim: 128
+    num_layers: 3
+    dropout: 0.1
+    activation: gelu
+    conv_type: sage
+    residual: true
+    layer_norm: true
+    undirected: true

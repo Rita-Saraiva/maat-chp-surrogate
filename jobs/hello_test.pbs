@@ -1,0 +1,20 @@
+#!/bin/bash
+#PBS -N hello_test
+#PBS -l nodes=1:ppn=1
+#PBS -l walltime=00:05:00
+#PBS -j oe
+#PBS -o /home/projects/dtu_00074/scratch/ritsar_code/Surrogate/hello_test.pbs.out
+
+cd /home/projects/dtu_00074/scratch/ritsar_code/Surrogate || exit 1
+
+echo "PBS job started"
+date
+hostname
+
+echo "Hello world" > hello_world.txt
+
+echo "Created:"
+ls -l hello_world.txt
+cat hello_world.txt
+
+echo "PBS job finished"

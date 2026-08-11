@@ -1,0 +1,32 @@
+#!/bin/bash
+#PBS -W group_list=dtu_00074
+#PBS -A dtu_00074
+#PBS -N build_dataset
+#PBS -l nodes=1:ppn=4
+#PBS -l mem=200gb
+#PBS -l walltime=04:00:00
+#PBS -o /home/projects/dtu_00074/scratch/ritsar_code/Surrogate/logs/data_processing/build_dataset_${FOLDER_NAME}_$PBS_JOBID.out
+#PBS -j oe
+
+set -euo pipefail
+
+PROJECT_ROOT="/home/projects/dtu_00074/scratch/ritsar_code/Surrogate"
+SCRATCH_ROOT="/home/projects/dtu_00074/scratch/ritsar_code"
+SIF="/home/projects/dtu_00074/apps/singularity_images/maat.sif"
+
+module load tools singularity/4.3.0
+module use /home/projects/dtu_00074/apps/modulefiles
+module load maat-container-loader
+
+singularity exec \
+    --pwd /mnt/project \
+    --bind "${PROJECT_ROOT}:/mnt/project" \
+    --bind "${SCRATCH_ROOT}:/mnt/ritsar_code:ro" \
+    "${SIF}" \
+    python -m src.build_dataset_multi \
+        --settings /mnt/project/configs/data/build_defaults.yaml \
+        --objective "${OBJECTIVE}" \
+        --folder-name "${FOLDER_NAME}" \
+        --buffer-name "${BUFFER_NAME}" \
+        --config "${CONFIG}" \
+        --job-id "${PBS_JOBID:-local}"

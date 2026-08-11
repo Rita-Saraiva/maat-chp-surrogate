@@ -1,0 +1,87 @@
+family: XGB
+
+# Gradient-boosted decision trees (XGBoost) with native multi-output.
+#
+# multi_strategy:
+#   one_output_per_tree  -> one single-output tree per target per round.
+#       Memory-safe: histogram is features x max_bin x 1 (independent of the
+#       number of targets). REQUIRED for the high-dimensional targets in this
+#       project (e.g. econ_rcp_26 delay = 9452 features x 834 outputs); the
+#       shared-leaf strategy OOMs there even on 64 GB. Cost: trains
+#       n_estimators x num_outputs trees, so it is slower and does not share tree
+#       structure across outputs.
+#   multi_output_tree    -> one vector-leaf tree shared across all targets.
+#       Histogram scales as features x max_bin x num_outputs, i.e. tens of GB for
+#       hundreds of outputs -> only usable for LOW output dimensions. MAX_SAMPLES
+#       does NOT reduce this (histogram size is independent of row count).
+#
+# Trees are scale-invariant, so the surrogate skips input/target standardization
+# regardless of the training standardization settings. CPU-only cluster: keep
+# tree_method=hist and n_jobs bounded by ppn (4). Requires XGBoost >= 2.0.
+profiles:
+  small_xgb:
+    n_estimators: 200
+    max_depth: 4
+    learning_rate: 0.1
+    subsample: 0.8
+    colsample_bytree: 0.8
+    min_child_weight: 1.0
+    reg_lambda: 1.0
+    reg_alpha: 0.0
+    gamma: 0.0
+    max_bin: 256
+    tree_method: hist
+    multi_strategy: one_output_per_tree
+    early_stopping_rounds: 20
+    n_jobs: 4
+
+  medium_xgb:
+    n_estimators: 400
+    max_depth: 6
+    learning_rate: 0.05
+    subsample: 0.8
+    colsample_bytree: 0.8
+    min_child_weight: 1.0
+    reg_lambda: 1.0
+    reg_alpha: 0.0
+    gamma: 0.0
+    max_bin: 256
+    tree_method: hist
+    multi_strategy: one_output_per_tree
+    early_stopping_rounds: 30
+    n_jobs: 4
+
+  large_xgb:
+    n_estimators: 800
+    max_depth: 8
+    learning_rate: 0.03
+    subsample: 0.8
+    colsample_bytree: 0.8
+    min_child_weight: 1.0
+    reg_lambda: 1.0
+    reg_alpha: 0.0
+    gamma: 0.0
+    max_bin: 256
+    tree_method: hist
+    multi_strategy: one_output_per_tree
+    early_stopping_rounds: 40
+    n_jobs: 4
+
+  # Shared vector-leaf tree across all targets. ONLY for low output dimensions;
+  # this OOMs on the project's high-dimensional components (see header). Provided
+  # for small targets or experimentation with a capped max_bin.
+  vectorleaf_xgb:
+    n_estimators: 200
+    max_depth: 4
+    learning_rate: 0.1
+    subsample: 0.8
+    colsample_bytree: 0.8
+    min_child_weight: 1.0
+    reg_lambda: 1.0
+    reg_alpha: 0.0
+    gamma: 0.0
+    max_bin: 64
+    tree_method: hist
+    multi_strategy: multi_output_tree
+    early_stopping_rounds: 20
+    n_jobs: 4

@@ -1,0 +1,13 @@
+# Normalize line endings. Shell and PBS scripts MUST stay LF so they run on the
+# Linux cluster (CRLF would break the bash shebang and here-docs).
+* text=auto eol=lf
+*.sh text eol=lf
+*.pbs text eol=lf
+*.py text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+
+# Notebooks and pickled buffers are treated as-is / binary.
+*.ipynb -text
+*.pkl binary
+*.pkl.bak binary

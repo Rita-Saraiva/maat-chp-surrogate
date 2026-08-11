@@ -1,0 +1,62 @@
+family: GP
+
+# Latent multi-output sparse variational GP (GPyTorch LMC). A small number of
+# latent GPs (num_latents) are combined into all output columns via a learned
+# mixing matrix, so memory scales with num_latents rather than num_tasks
+# (== output_dim). Cost scales with num_latents * num_inducing^2; start from the
+# smaller profiles before scaling up.
+profiles:
+  tiny_gp:
+    num_inducing_points: 16
+    num_latents: 8
+    kernel_type: matern
+    use_ard: false
+    shared_inducing_points: true
+    use_softplus_likelihood: true
+    learning_rate: 0.01
+    eval_batch_size: 128
+    inducing_seed: 42
+
+  small_gp:
+    num_inducing_points: 64
+    num_latents: 16
+    kernel_type: matern
+    use_ard: false
+    shared_inducing_points: true
+    use_softplus_likelihood: true
+    learning_rate: 0.01
+    eval_batch_size: 256
+    inducing_seed: 42
+
+  medium_gp:
+    num_inducing_points: 128
+    num_latents: 24
+    kernel_type: matern
+    use_ard: false
+    shared_inducing_points: true
+    use_softplus_likelihood: true
+    learning_rate: 0.01
+    eval_batch_size: 512
+    inducing_seed: 42
+
+  large_gp:
+    num_inducing_points: 256
+    num_latents: 32
+    kernel_type: matern
+    use_ard: false
+    shared_inducing_points: true
+    use_softplus_likelihood: true
+    learning_rate: 0.01
+    eval_batch_size: 1024
+    inducing_seed: 42
+
+  xlarge_gp:
+    num_inducing_points: 512
+    num_latents: 32
+    kernel_type: matern
+    use_ard: false
+    shared_inducing_points: true
+    use_softplus_likelihood: true
+    learning_rate: 0.01
+    eval_batch_size: 256
+    inducing_seed: 42

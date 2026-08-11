@@ -1,0 +1,36 @@
+family: VAE
+
+# Variational regressor q(z|x) -> decode(z) -> y with recon + beta*KL loss.
+# decoder_hidden_dims omitted => the decoder mirrors the encoder (reversed).
+profiles:
+  small_vae:
+    encoder_hidden_dims: [256, 128]
+    latent_dim: 32
+    dropout: 0.05
+    beta_start: 0.0
+    beta_final: 0.001
+    beta_warmup_epochs: 30
+
+  medium_vae:
+    encoder_hidden_dims: [512, 256, 128]
+    latent_dim: 32
+    dropout: 0.05
+    beta_start: 0.0
+    beta_final: 0.001
+    beta_warmup_epochs: 30
+
+  wide_vae:
+    encoder_hidden_dims: [1024, 512, 256]
+    latent_dim: 32
+    dropout: 0.05
+    beta_start: 0.0
+    beta_final: 0.001
+    beta_warmup_epochs: 30
+
+  large_vae:
+    encoder_hidden_dims: [2048, 1024, 512]
+    latent_dim: 64
+    dropout: 0.05
+    beta_start: 0.0
+    beta_final: 0.001
+    beta_warmup_epochs: 30

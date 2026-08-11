@@ -1,0 +1,31 @@
+loader_mode: chunked
+batch_size: 1024
+num_workers: 0
+pin_memory: true
+
+training:
+  epochs: 200
+  loss: mse
+  patience: 20
+  minimum_delta: 1.0e-7
+  print_every: 25
+  gradient_clip: null
+  seed: 42
+  device: auto
+  deterministic: false
+
+  optimizer:
+    name: adamw
+    learning_rate: 1.0e-3
+    weight_decay: 1.0e-5
+
+  scheduler:
+    enabled: true
+    factor: 0.5
+    patience: 5
+    minimum_learning_rate: 1.0e-7
+
+  standardization:
+    inputs: true
+    targets: true
+    epsilon: 1.0e-6

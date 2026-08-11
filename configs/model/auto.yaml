@@ -1,0 +1,35 @@
+family: Auto
+
+# Supervised bottleneck regressor: x -> encoder(hidden) -> latent -> predictor -> y.
+# The predictor mirrors the encoder (reversed hidden_dims); specify only the
+# encoder hidden_dims and the latent_dim.
+profiles:
+  small_bottleneck:
+    hidden_dims: [256, 128]
+    latent_dim: 32
+    dropout: 0.05
+
+  medium_bottleneck:
+    hidden_dims: [512, 256, 128]
+    latent_dim: 32
+    dropout: 0.05
+
+  deep_bottleneck:
+    hidden_dims: [512, 256, 128, 64]
+    latent_dim: 32
+    dropout: 0.05
+
+  wide_bottleneck:
+    hidden_dims: [1024, 512]
+    latent_dim: 64
+    dropout: 0.05
+
+  wide_xl_bottleneck:
+    hidden_dims: [2048, 1024, 512]
+    latent_dim: 64
+    dropout: 0.05
+
+  large_bottleneck:
+    hidden_dims: [4096, 2048, 1024]
+    latent_dim: 128
+    dropout: 0.05

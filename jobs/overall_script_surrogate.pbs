@@ -1,0 +1,77 @@
+#!/bin/bash
+#PBS -W group_list=dtu_00074
+#PBS -A dtu_00074
+#PBS -N overall_script_surrogate
+#PBS -l nodes=1:ppn=40
+#PBS -l mem=200gb
+#PBS -m abe
+#PBS -l walltime=450:00:00
+#PBS -o logs/rl/overall_script_surrogate_${CONFIG_NAME}_$PBS_JOBID.out
+#PBS -j oe
+
+# Surrogate-backed RL training job: runs overall_script_surrogate.py instead of
+# overall_script_modified.py. Same container/module setup as the existing
+# qol_StorKbh_10_env.pbs / economic_rf_2_cph_rcp_26.pbs jobs, plus visibility into the trained
+# surrogate pipeline (src/surrogate_runtime.py, src/models, src/config, checkpoints under
+# outputs/, and configs/overall_surrogate/ for the env.surrogate config YAMLs) from the separate
+# "Surrogate" checkout.
+#
+# IMPORTANT (learned from job 61668130): /mnt/project is NOT something this job's own --bind
+# controls -- `module load maat-container-loader` (or the .sif itself) already binds
+# /home/projects/dtu_00074/code/maat_rl_intro there (that's where `import maat` actually resolves
+# from; singularity just warns "destination is already in the mount point list" and keeps the
+# module's bind if you also pass --bind ...:/mnt/project yourself). So the "Surrogate" checkout
+# (src/, configs/overall_surrogate/, outputs/, results/) is bound to a different mount point,
+# /mnt/surrogate, instead.
+#
+# Submit with `qsub -v`, matching this repo's train_surrogate.pbs / evaluate_surrogate.pbs
+# convention, e.g.:
+#
+#   WORK_DIR=/home/projects/dtu_00074/scratch/ritsar_code/Overall_Surrogate \
+#   CONFIG_NAME=economic_surrogate_cph_rcp26 \
+#   qsub -v WORK_DIR,CONFIG_NAME scripts/overall_script_surrogate.pbs
+#
+# WORK_DIR is required: the job-specific working directory containing overall_script_surrogate.py
+# (deploy it there yourself -- RL_framework/ in this repo checkout is a *local reference copy
+# only*, it does not exist on the cluster). It does NOT need its own `maat/` copy -- that comes
+# from /mnt/project (maat_rl_intro) as described above. WORK_DIR is only used for the driver
+# script itself plus scratch output dirs (cache/ckpt/logs/tensorboard).
+# SURROGATE_ROOT defaults to this repo's own scratch checkout (same default PROJECT_ROOT used by
+# train_surrogate.pbs/evaluate_surrogate.pbs) since that's where the trained models actually are.
+: "${WORK_DIR:?WORK_DIR is required -- the job directory containing overall_script_surrogate.py}"
+: "${CONFIG_NAME:?CONFIG_NAME is required -- e.g. economic_surrogate_cph_rcp26 or qol_surrogate_StorKbh_1_env}"
+SURROGATE_ROOT="${SURROGATE_ROOT:-/home/projects/dtu_00074/scratch/ritsar_code/Surrogate}"
+
+set -euo pipefail
+echo "Running on host: $HOSTNAME"
+echo "WORK_DIR=${WORK_DIR}"
+echo "SURROGATE_ROOT=${SURROGATE_ROOT}"
+echo "CONFIG_NAME=${CONFIG_NAME}"
+cd "$PBS_O_WORKDIR"
+
+export HDF5_USE_FILE_LOCKING=FALSE
+export TMPDIR=/tmp/surrogate_${PBS_JOBID}
+mkdir -p "$TMPDIR"
+
+module load tools singularity/4.3.0
+module use /home/projects/dtu_00074/apps/modulefiles
+module load maat-container-loader
+
+singularity exec \
+  --bind "${WORK_DIR}:/mnt/work" \
+  --bind "${SURROGATE_ROOT}:/mnt/surrogate" \
+  --bind /home/projects/dtu_00074/data/MAAT:/mnt/raid1/MAAT \
+  "$MAAT_SIF" bash -lc '
+    set -euo pipefail
+    cd /mnt/work
+    mkdir -p cache cache/tmp logs outputs ckpt ppo_tensorboard
+
+    export PYTHONPATH=/mnt/project:/mnt/surrogate:${PYTHONPATH:-}
+    export TMPDIR=/tmp/surrogate_${PBS_JOBID}
+    mkdir -p "$TMPDIR"
+    export HYDRA_FULL_ERROR=1
+
+    python /mnt/work/overall_script_surrogate.py \
+      --config-path /mnt/surrogate/configs/overall_surrogate \
+      --config-name '"$CONFIG_NAME"'
+  '

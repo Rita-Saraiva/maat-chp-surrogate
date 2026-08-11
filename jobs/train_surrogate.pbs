@@ -1,0 +1,94 @@
+#!/bin/bash
+#PBS -W group_list=dtu_00074
+#PBS -A dtu_00074
+#PBS -N train_surrogate
+#PBS -l nodes=1:ppn=4
+#PBS -l mem=128gb
+#PBS -l walltime=48:00:00
+#PBS -o logs/train/train_${DATASET}_${MODE}_${OBJECTIVE}_${COMPONENT}_${MODEL}_${PARAMETERS}_$PBS_JOBID.out
+#PBS -j oe
+
+set -euo pipefail
+
+PROJECT_ROOT="${PROJECT_ROOT:-/home/projects/dtu_00074/scratch/ritsar_code/Surrogate}"
+SIF="${SIF:-/home/projects/dtu_00074/apps/singularity_images/maat.sif}"
+JOB_ID="${PBS_JOBID:-local}"
+
+trap 'status=$?; printf "ERROR: command failed at line %s with exit status %s\n" "${LINENO}" "${status}"; exit "${status}"' ERR
+
+: "${OBJECTIVE:?OBJECTIVE is required}"
+: "${DATASET:?DATASET is required}"
+: "${MODE:?MODE is required}"
+: "${MODEL:?MODEL is required}"
+: "${PARAMETERS:?PARAMETERS is required}"
+: "${COMPONENT:?COMPONENT is required}"
+
+printf '\n============================================================\n'
+printf 'Started: %s\n' "$(date)"
+printf 'Job ID: %s\n' "${JOB_ID}"
+printf 'Host: %s\n' "$(hostname)"
+printf 'Run: OBJECTIVE=%s DATASET=%s MODE=%s MODEL=%s PARAMETERS=%s COMPONENT=%s LOADER_MODE=%s\n' \
+  "${OBJECTIVE}" "${DATASET}" "${MODE}" "${MODEL}" \
+  "${PARAMETERS}" "${COMPONENT}" "${LOADER_MODE:-chunked}"
+printf '============================================================\n'
+
+
+
+cd "${PROJECT_ROOT}"
+module load tools singularity/4.3.0
+
+unset PYTHONPATH PYTHONHOME PYTHONUSERBASE
+unset SINGULARITY_BIND SINGULARITY_BINDPATH APPTAINER_BIND APPTAINER_BINDPATH
+
+# Forward a host variable into the container (Singularity strips the prefix).
+fwd()     { export "SINGULARITYENV_$1=${!1}"; }
+# Same, but skip if the variable is unset or empty.
+fwd_opt() { [ -n "${!1:-}" ] && fwd "$1" || true; }
+
+# CPU-only training: pin BLAS/OpenMP to the reserved cores inside the container.
+CPU_THREADS="${CPU_THREADS:-4}"
+for lib in OMP MKL OPENBLAS NUMEXPR; do
+  export "SINGULARITYENV_${lib}_NUM_THREADS=${CPU_THREADS}"
+done
+
+# Fixed container paths / interpreter settings.
+export SINGULARITYENV_PROJECT_ROOT=/mnt/project
+export SINGULARITYENV_OUTPUT_ROOT=/mnt/project
+# outside the container (e.g. xgboost via scripts/install_container_deps.sh) import.
+export SINGULARITYENV_PYTHONPATH=/mnt/project:/mnt/project/.python_deps
+export SINGULARITYENV_PYTHONNOUSERSITE=1
+export SINGULARITYENV_PYTHONUNBUFFERED=1
+
+# Run configuration (required upfront; LOADER_MODE gets a default).
+LOADER_MODE="${LOADER_MODE:-chunked}"
+for v in OBJECTIVE DATASET MODE MODEL PARAMETERS COMPONENT LOADER_MODE; do
+  fwd "$v"
+done
+export SINGULARITYENV_PBS_JOBID="${JOB_ID}"
+
+# Optional overrides, forwarded only when provided.
+for v in TRAIN_CONFIG MODEL_CONFIG MAX_SAMPLES BATCH_SIZE NUM_WORKERS TRAIN_FRACTION; do
+  fwd_opt "$v"
+done
+
+STAGE_ARGS=()
+if [ "${STAGE_TO_TMP:-0}" = "1" ]; then
+  STAGE_DIR="${TMPDIR:-/tmp}/surrogate_${JOB_ID}"
+  mkdir -p "${STAGE_DIR}"
+  printf 'Staging dataset %s to %s\n' "${DATASET}" "${STAGE_DIR}"
+  cp -r "${PROJECT_ROOT}/data/${DATASET}" "${STAGE_DIR}/"
+  export SINGULARITYENV_DATA_ROOT=/mnt/data_local
+  STAGE_ARGS=(--bind "${STAGE_DIR}:/mnt/data_local")
+fi
+
+
+printf 'Starting surrogate training\n'
+singularity exec \
+  --cleanenv \
+  --pwd /mnt/project \
+  --bind "${PROJECT_ROOT}:/mnt/project" \
+  "${STAGE_ARGS[@]}" \
+  "${SIF}" \
+  python -u -m src.train_surrogate
+
+printf 'Finished successfully: %s\n' "$(date)"

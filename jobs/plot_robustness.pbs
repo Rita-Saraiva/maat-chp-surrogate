@@ -1,0 +1,66 @@
+#!/bin/bash
+#PBS -W group_list=dtu_00074
+#PBS -A dtu_00074
+#PBS -N plot_robustness
+#PBS -l nodes=1:ppn=1
+#PBS -l mem=8gb
+#PBS -l walltime=00:30:00
+#PBS -o logs/analysis/plot_robustness_$PBS_JOBID.out
+#PBS -j oe
+
+# Aggregate results/tables/run_fraction.pkl and render fraction-vs-robustness
+# curves to results/analysis/robustness/:
+#   * one figure per model + parameter profile (a single curve), and
+#   * one figure per model overlaying every parameter profile.
+# Each figure has a subplot per test metric (R2, RMSE, MAE).
+#
+# Optional filters via PLOT_ARGS, e.g.
+#   PLOT_ARGS="--dataset qol_combined --model MLP" \
+#     qsub -v PLOT_ARGS scripts/plot_robustness.pbs
+#
+# The same command also works locally (no cluster needed):
+#   python -m src.experiments.plot_robustness [filters]
+
+set -Eeuo pipefail
+
+PROJECT_ROOT="${PROJECT_ROOT:-/home/projects/dtu_00074/scratch/ritsar_code/Surrogate}"
+SIF="${SIF:-/home/projects/dtu_00074/apps/singularity_images/maat.sif}"
+JOB_ID="${PBS_JOBID:-local}"
+
+trap 'status=$?; printf "ERROR: command failed at line %s with exit status %s\n" "${LINENO}" "${status}"; exit "${status}"' ERR
+
+printf '\n============================================================\n'
+printf 'Started: %s\n' "$(date)"
+printf 'Job ID: %s\n' "${JOB_ID}"
+printf 'Host: %s\n' "$(hostname)"
+printf 'Plot args: %s\n' "${PLOT_ARGS:-<none>}"
+printf '============================================================\n'
+
+cd "${PROJECT_ROOT}"
+mkdir -p "${PROJECT_ROOT}/logs/analysis"
+module load tools singularity/4.3.0
+
+unset PYTHONPATH PYTHONHOME PYTHONUSERBASE
+unset SINGULARITY_BIND SINGULARITY_BINDPATH APPTAINER_BIND APPTAINER_BINDPATH
+
+# Fixed container paths / interpreter settings.
+export SINGULARITYENV_PROJECT_ROOT=/mnt/project
+export SINGULARITYENV_OUTPUT_ROOT=/mnt/project
+export SINGULARITYENV_PYTHONPATH=/mnt/project:/mnt/project/.python_deps
+export SINGULARITYENV_PYTHONNOUSERSITE=1
+export SINGULARITYENV_PYTHONUNBUFFERED=1
+# Headless matplotlib (no display on the compute node).
+export SINGULARITYENV_MPLBACKEND=Agg
+
+# Forward the optional filter string into the container.
+[ -n "${PLOT_ARGS:-}" ] && export SINGULARITYENV_PLOT_ARGS="${PLOT_ARGS}"
+
+printf 'Plotting robustness curves\n'
+singularity exec \
+  --cleanenv \
+  --pwd /mnt/project \
+  --bind "${PROJECT_ROOT}:/mnt/project" \
+  "${SIF}" \
+  bash -c 'python -u -m src.experiments.plot_robustness ${PLOT_ARGS:-}'
+
+printf 'Finished successfully: %s\n' "$(date)"

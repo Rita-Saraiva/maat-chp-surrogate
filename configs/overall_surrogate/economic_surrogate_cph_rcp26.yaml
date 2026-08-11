@@ -1,0 +1,212 @@
+# config.yaml
+#
+# Surrogate-backed variant of fullcopenhagen_configs/economic_cph_rcp26.yaml, for use with
+# overall_script_surrogate.py. Everything under `env:` is unchanged from that file except the
+# added `surrogate:` block below and `use_gp_surrogate: true` (see overall_script_surrogate.py's
+# install_surrogate_patches(): this now acts as a manual kill switch on top of the surrogate
+# targets actually being configured, not a request for the legacy GP surrogate).
+#
+# HOW TO FILL IN THE PLACEHOLDERS BELOW:
+#   Each surrogate.<target> entry identifies one trained checkpoint the same way
+#   results/runs/*.yaml records it. For a given run's YAML (e.g. results/runs/61618440_econ_rcp_26_single_MLP_delay.yaml):
+#     job_id       <- "Job Id"
+#     family       <- "Model"
+#     mode         <- "Mode"                  ("single" or "multi")
+#     train_dataset<- "Dataset"
+#     profile      <- "Parameters" -> "Profile"
+#     component    <- "Component" (only needed if it differs from the target name below)
+#   For a multi-head checkpoint (mode: multi), also set `head:` to the target name as it
+#   appears in that checkpoint's head_output_dims/head_slices (usually the same as the
+#   surrogate.<target> key itself, e.g. "delay").
+#
+# Entries left as job_id: "REPLACE_ME" (or omitted/null) keep using the real simulation/analytic
+# computation for that target -- see surrogate_runtime.py's module docstring. Note: delay, cancel,
+# and infra are only used if *all three* are configured -- MAAT's transport simulator computes
+# them together in one call, so a partially-configured triad falls back to the real simulation
+# for the whole transport step (a warning is printed at env creation).
+
+env:
+  _convert_: partial
+
+  assets_types:
+    - "network"
+
+  render_mode: human
+
+  case_study:
+    _target_: hydra.utils.get_object
+    path: maat.world.ExperimentLocation.Copenhagen
+
+  event_types:
+    - _target_: hydra.utils.get_object
+      path: maat.events.EventType.RAINFALL
+
+  event_properties:
+    preload_to_memory: true
+    sampling_scheme:
+      _target_: hydra.utils.get_object
+      path: maat.events.RainfallSampling.KLIMAATLAS
+    events_disk_location: "hdf5/resampled_10m"
+    custom_intensity_array: []
+    custom_array_add_noise: false
+    deterministic_intensity: 80
+    klimaatlas_rcp: "RCP2.6"
+
+  episode_time_steps: 77
+
+  periods_per_time_step: 1
+
+  transport_network_type:
+    _target_: hydra.utils.get_object
+    path: maat.transport.TransportNetworkType.FULL
+
+  transport_modes:
+    - _target_: hydra.utils.get_object
+      path: maat.transport.TransportMode.CAR
+    - _target_: hydra.utils.get_object
+      path: maat.transport.TransportMode.BICYCLE
+    - _target_: hydra.utils.get_object
+      path: maat.transport.TransportMode.ON_FOOT
+
+  wb_parameters:
+    {}
+
+  rl_reward_components:
+    - _target_: maat.reward.RewardComponent
+      beta: -1.0
+      name:
+        _target_: hydra.utils.get_object
+        path: maat.reward.RewardComponentName.ImpactTransportDirectInfrastructure
+      scaling_alpha: 1e-8
+    - _target_: maat.reward.RewardComponent
+      beta: -1.0
+      name:
+        _target_: hydra.utils.get_object
+        path: maat.reward.RewardComponentName.ImpactTransportIndirectDelays
+      scaling_alpha: 1e-8
+    - _target_: maat.reward.RewardComponent
+      beta: -1.0
+      name:
+        _target_: hydra.utils.get_object
+        path: maat.reward.RewardComponentName.ImpactTransportIndirectNoTravel
+      scaling_alpha: 1e-8
+    - _target_: maat.reward.RewardComponent
+      beta: -1.0
+      name:
+        _target_: hydra.utils.get_object
+        path: maat.reward.RewardComponentName.ActionsDirectCost
+      scaling_alpha: 1e-8
+    - _target_: maat.reward.RewardComponent
+      beta: -1.0
+      name:
+        _target_: hydra.utils.get_object
+        path: maat.reward.RewardComponentName.ActionsMaintenanceCost
+      scaling_alpha: 1e-8
+
+  rl_actions:
+    - _target_: hydra.utils.get_object
+      path: maat.actions.DoNothing
+    - _target_: hydra.utils.get_object
+      path: maat.actions.BioretentionPlanters
+    - _target_: hydra.utils.get_object
+      path: maat.actions.Soakaway
+    - _target_: hydra.utils.get_object
+      path: maat.actions.StorageTank
+    - _target_: hydra.utils.get_object
+      path: maat.actions.PermeablePavements_PorousAsphalt
+    - _target_: hydra.utils.get_object
+      path: maat.actions.PermeablePavements_PerviousConcrete
+    - _target_: hydra.utils.get_object
+      path: maat.actions.PermeablePavements_PICP
+    - _target_: hydra.utils.get_object
+      path: maat.actions.PermeablePavements_GridPavers
+
+  rl_actions_restricted:
+    {}
+
+  # Manual kill switch: even with delay/cancel/infra fully configured below, setting this to
+  # false forces the real simulation. See overall_script_surrogate.py::install_surrogate_patches().
+  use_gp_surrogate: true
+
+  # Root directory containing `outputs/<family>/<mode>/<dataset>/<component>/<profile>/<job_id>/checkpoints/model.pt`
+  # for the trained src/ surrogate checkpoints (i.e. the src/ pipeline's PROJECT_ROOT /
+  # OUTPUT_ROOT). Defaults to /mnt/surrogate -- the separate "Surrogate" checkout's bind mount on
+  # this cluster (distinct from /mnt/project, which is module-provided for `maat`; see
+  # overall_script_surrogate.pbs for the full explanation).
+  surrogate_output_root: "/mnt/surrogate"
+
+  # Best single-head model per component from the econ_combined sweep (see results/runs/):
+  #   delay:   61625869          Auto/wide_bottleneck  Test R2=0.6327
+  #   cancel:  61625904[2]       GNN/small_gnn         Test R2=0.2463  (weakest of the three -- see note below)
+  #   infra:   61625902[1]       MLP/simple_mlp        Test R2=0.9974
+  # `cancel`'s R2 is much lower than the other two; consider treating this triad as experimental
+  # until a better `cancel` model is trained, or trying the multi-head alternative commented out
+  # below.
+  surrogate:
+    delay:
+      job_id: "61625869"
+      family: "Auto"
+      mode: "single"
+      train_dataset: "econ_combined"
+      profile: "wide_bottleneck"
+    cancel:
+      job_id: "61625904[2]"
+      family: "GNN"
+      mode: "single"
+      train_dataset: "econ_combined"
+      profile: "small_gnn"
+    infra:
+      job_id: "61625902[1]"
+      family: "MLP"
+      mode: "single"
+      train_dataset: "econ_combined"
+      profile: "simple_mlp"
+    # action/maintenance are computed directly by MAAT from each action's known cost tables
+    # (step_process_actions), independent of the transport simulation -- there is normally no
+    # benefit to routing them through a surrogate. Left null here; fill in only if you
+    # specifically want to test overriding them (e.g. from a multi-head Econ checkpoint that
+    # also predicts them -- set mode: "multi" and head: "action"/"maintenance").
+    action: null
+    maintenance: null
+    # Multi-head alternative: comment out the three single-head entries above and use one
+    # checkpoint that predicts delay/cancel/infra together, e.g.:
+    # delay:
+    #   job_id: "REPLACE_ME"
+    #   family: "GNN"
+    #   mode: "multi"
+    #   train_dataset: "REPLACE_ME"
+    #   profile: "REPLACE_ME"
+    #   head: "delay"
+    # cancel: {job_id: "REPLACE_ME", family: "GNN", mode: "multi", train_dataset: "REPLACE_ME", profile: "REPLACE_ME", head: "cancel"}
+    # infra:  {job_id: "REPLACE_ME", family: "GNN", mode: "multi", train_dataset: "REPLACE_ME", profile: "REPLACE_ME", head: "infra"}
+
+
+training:
+  # Environment parameters
+  env_starting_index: 260
+  env_total_number_environments: 1
+
+  # Training parameters
+  total_timesteps: 386
+
+  # MaskablePPO parameters
+  verbose: 2
+  device: "cpu"
+  n_steps: 1024
+  n_epochs: 10
+  batch_size: 64
+  ent_coef: 0.01
+  target_kl: 0.2
+  tensorboard_log: "./ppo_tensorboard"
+
+  # Continue training
+  continue_training: false
+  continued_training_name: "continued"
+
+
+wandb:
+  entity: "maat_dtu"
+  project: "economic_copenhagen"
+  name: "economic_surrogate_cph_rcp26"
+  config_log: true
+  sync_tensorboard: true

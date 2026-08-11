@@ -1,0 +1,27 @@
+family: MLP
+
+# Direct feed-forward regressor: x -> hidden layers -> y.
+profiles:
+  simple_mlp:
+    hidden_dims: [512, 256]
+    dropout: 0.05
+    activation: gelu
+    layer_norm: false
+
+  deep_mlp:
+    hidden_dims: [512, 256, 128, 64]
+    dropout: 0.05
+    activation: gelu
+    layer_norm: true
+
+  wide_mlp:
+    hidden_dims: [2048, 1024]
+    dropout: 0.05
+    activation: gelu
+    layer_norm: false
+
+  large_mlp:
+    hidden_dims: [4096, 2048, 1024]
+    dropout: 0.05
+    activation: gelu
+    layer_norm: true

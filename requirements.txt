@@ -1,0 +1,19 @@
+# Python 3.10+ recommended.
+#
+# Core runtime dependencies (required for every model family).
+numpy>=1.24
+torch>=2.0
+pyyaml>=6.0
+pydantic>=2,<3
+pandas>=2.0
+matplotlib>=3.7
+
+# Optional model-family dependencies. These are imported lazily, so install only
+# the ones you need for the surrogate families you plan to train.
+#
+#   xgboost  -> MODEL=XGB  (>=2.0 required for native multi-output trees)
+#   gpytorch -> MODEL=GP
+#   scipy    -> policy rank-correlation metrics (Kendall / Spearman)
+xgboost>=2.0
+gpytorch>=1.11
+scipy>=1.10

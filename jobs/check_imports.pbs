@@ -1,0 +1,25 @@
+#!/bin/bash
+#PBS -W group_list=dtu_00074
+#PBS -A dtu_00074
+#PBS -N train_surrogate
+#PBS -l nodes=1:ppn=4
+#PBS -l mem=64gb
+#PBS -l walltime=12:00:00
+#PBS -o logs/check_imports_$PBS_JOBID.out
+#PBS -j oe
+
+set -Eeuo pipefail
+
+PROJECT_ROOT="${PROJECT_ROOT:-/home/projects/dtu_00074/scratch/ritsar_code/$
+SIF="${SIF:-/home/projects/dtu_00074/apps/singularity_images/maat.sif}"
+
+module load tools singularity/4.3.0
+
+printf 'Running Imports preflight check\n'
+singularity exec \
+  --cleanenv \
+  --pwd /mnt/project \
+  --bind "${PROJECT_ROOT}:/mnt/project" \
+  "${SIF}" \
+  python -u -c \
+  "import xgboost; print(xgboost.__version__)"

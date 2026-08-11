@@ -1,0 +1,185 @@
+# config.yaml
+#
+# Multi-head variant of qol_surrogate_StorKbh_1_env.yaml: uses ONE checkpoint (job 61661619,
+# MLP/simple_mlp, mode=multi) that predicts qol/action/maintenance together, instead of a
+# dedicated single-head model per target. From results/runs/61661619_qol_combined_multi_MLP_multi_all.yaml:
+#   Heads: {qol: 834, action: 278, maintenance: 278}, Test R2: qol=0.99991, action=0.85713, maintenance=0.91164
+# All three heads come from the same forward pass (surrogate_runtime caches nothing across
+# targets today, so this still runs the network three times per step -- one per configured
+# target -- but only ever loads/holds the one checkpoint).
+#
+# action/maintenance are otherwise computed directly by MAAT from each action's known cost
+# tables, independent of simulation -- this file exists specifically to exercise/demonstrate that
+# override path with real numbers, not because it's expected to outperform the analytic
+# computation. Compare against qol_surrogate_StorKbh_1_env.yaml (qol-only, action/maintenance
+# left as null i.e. analytic) if you want a cleaner ablation.
+#
+# Everything under `env:` is otherwise identical to qol_surrogate_StorKbh_1_env.yaml.
+
+env:
+  _convert_: partial
+
+  assets_types:
+    - "network"
+
+  render_mode: human
+
+  case_study:
+    _target_: hydra.utils.get_object
+    path: maat.world.CaseStudy.Copenhagen
+
+  event_types:
+    - _target_: hydra.utils.get_object
+      path: maat.events.EventType.RAINFALL
+
+  event_properties:
+    preload_to_memory: true
+    sampling_scheme:
+      _target_: hydra.utils.get_object
+      path: maat.events.RainfallSampling.KLIMAATLAS
+    events_disk_location: "hdf5/resampled_10m"
+    custom_intensity_array: []
+    custom_array_add_noise: false
+    deterministic_intensity: 80
+    klimaatlas_rcp: "RCP8.5"
+
+  episode_time_steps: 77
+
+  periods_per_time_step: 1
+
+  transport_network_type:
+    _target_: hydra.utils.get_object
+    path: maat.transport.TransportNetworkType.FULL
+
+  transport_modes:
+    - _target_: hydra.utils.get_object
+      path: maat.transport.TransportMode.CAR
+    - _target_: hydra.utils.get_object
+      path: maat.transport.TransportMode.BICYCLE
+    - _target_: hydra.utils.get_object
+      path: maat.transport.TransportMode.ON_FOOT
+
+  wb_parameters:
+    QOL:
+      weights:
+        public_transportation: 0.1461988123080803
+        health: 0.1517917806543416
+        sports: 0.0702377624889665
+        cultural: 0.1387443363701299
+        green_space: 0.2109836622421156
+        public_spaces: 0.1903329393315785
+        education: 0.0917107066047863
+
+  rl_reward_components:
+    - _target_: maat.reward.RewardComponent
+      _convert_: partial
+      beta: 0.5
+      name:
+        _target_: hydra.utils.get_object
+        path: maat.reward.RewardComponentName.WellbeingQualityOfLife
+      normalize_range:
+        - 35 # 34.00966616636268
+        - 45 # 44.28789731600069
+    - _target_: maat.reward.RewardComponent
+      _convert_: partial
+      beta: -0.9932
+      name:
+        _target_: hydra.utils.get_object
+        path: maat.reward.RewardComponentName.ActionsDirectCost
+      normalize_range:
+        - 0
+        - 4896446600
+    - _target_: maat.reward.RewardComponent
+      _convert_: partial
+      beta: -0.0068
+      name:
+        _target_: hydra.utils.get_object
+        path: maat.reward.RewardComponentName.ActionsMaintenanceCost
+      normalize_range:
+        - 0
+        - 33490475
+
+  rl_actions:
+    - _target_: hydra.utils.get_object
+      path: maat.actions.DoNothing
+    - _target_: hydra.utils.get_object
+      path: maat.actions.BioretentionPlanters
+    - _target_: hydra.utils.get_object
+      path: maat.actions.Soakaway
+    - _target_: hydra.utils.get_object
+      path: maat.actions.StorageTank
+    - _target_: hydra.utils.get_object
+      path: maat.actions.PermeablePavements_PorousAsphalt
+    - _target_: hydra.utils.get_object
+      path: maat.actions.PermeablePavements_PerviousConcrete
+    - _target_: hydra.utils.get_object
+      path: maat.actions.PermeablePavements_PICP
+    - _target_: hydra.utils.get_object
+      path: maat.actions.PermeablePavements_GridPavers
+
+  rl_actions_restricted:
+    {}
+
+  use_gp_surrogate: true
+
+  surrogate_output_root: "/mnt/surrogate"
+
+  surrogate:
+    qol:
+      job_id: "61661619"
+      family: "MLP"
+      mode: "multi"
+      train_dataset: "qol_combined"
+      profile: "simple_mlp"
+      head: "qol"
+    action:
+      job_id: "61661619"
+      family: "MLP"
+      mode: "multi"
+      train_dataset: "qol_combined"
+      profile: "simple_mlp"
+      head: "action"
+    maintenance:
+      job_id: "61661619"
+      family: "MLP"
+      mode: "multi"
+      train_dataset: "qol_combined"
+      profile: "simple_mlp"
+      head: "maintenance"
+
+
+training:
+  # Environment parameters
+  env_starting_index: 101
+  env_total_number_environments: 1
+  subproc_start_method: "spawn"
+  worker_traceback_dump_seconds: 600
+  main_traceback_dump_seconds: 1800
+
+  # Training parameters
+
+  total_timesteps: 386
+
+  # MaskablePPO parameters
+  verbose: 2
+  device: "cpu"
+  n_steps: 1024
+  n_epochs: 10
+  batch_size: 64
+  ent_coef: 0.01
+  target_kl: 0.2
+  tensorboard_log: "./ppo_tensorboard"
+
+  # Continue training
+
+  continue_training: false
+  continued_training_name: "continued"
+
+
+wandb:
+  entity: "maat_dtu"
+
+  project: "rl_StorKbh"
+  name: "qol_surrogate_multihead_StorKbh_1_env_rcp_85"
+  config_log: true
+  sync_tensorboard: true

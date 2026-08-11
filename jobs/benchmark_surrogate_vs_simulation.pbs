@@ -1,0 +1,70 @@
+#!/bin/bash
+#PBS -W group_list=dtu_00074
+#PBS -A dtu_00074
+#PBS -N benchmark_surrogate_vs_simulation
+#PBS -l nodes=1:ppn=8
+#PBS -l mem=64gb
+#PBS -l walltime=8:00:00
+#PBS -o logs/benchmark/benchmark_surrogate_${CONFIG_NAME}_$PBS_JOBID.out
+#PBS -j oe
+
+# Phase 2: times real-simulation vs. surrogate-backed env.step() on the same RL config and
+# action sequence (see src/benchmark_surrogate_vs_simulation.py). Real transport-simulation
+# steps can be slow, so this uses a small node (8 ppn) rather than the 40-ppn RL training jobs --
+# only one environment is ever stepped at a time, sequentially, in each of the two conditions.
+#
+# Same /mnt/project vs /mnt/surrogate situation as overall_script_surrogate.pbs (see that file's
+# comment block for the full story): /mnt/project is module-provided (bound to maat_rl_intro,
+# where `import maat` resolves from), NOT something this job binds itself. The "Surrogate"
+# checkout (src/, configs/overall_surrogate/, outputs/, results/) is bound separately to
+# /mnt/surrogate.
+#
+# Submit with `qsub -v`, same convention as overall_script_surrogate.pbs / train_surrogate.pbs:
+#
+#   WORK_DIR=/home/projects/dtu_00074/scratch/ritsar_code/Overall_Surrogate \
+#   CONFIG_NAME=economic_surrogate_cph_rcp26 \
+#   qsub -v WORK_DIR,CONFIG_NAME scripts/benchmark_surrogate_vs_simulation.pbs
+#
+# WORK_DIR: job-specific dir containing overall_script_modified.py and
+# overall_script_surrogate.py (no `maat/` copy needed -- see above). SURROGATE_ROOT defaults to
+# this repo's own scratch checkout, same as overall_script_surrogate.pbs.
+: "${WORK_DIR:?WORK_DIR is required -- the job directory containing the driver scripts}"
+: "${CONFIG_NAME:?CONFIG_NAME is required -- e.g. economic_surrogate_cph_rcp26 or qol_surrogate_StorKbh_1_env}"
+SURROGATE_ROOT="${SURROGATE_ROOT:-/home/projects/dtu_00074/scratch/ritsar_code/Surrogate}"
+STEPS="${STEPS:-30}"
+WARMUP="${WARMUP:-5}"
+
+set -euo pipefail
+echo "Running on host: $HOSTNAME"
+echo "WORK_DIR=${WORK_DIR} SURROGATE_ROOT=${SURROGATE_ROOT} CONFIG_NAME=${CONFIG_NAME} STEPS=${STEPS} WARMUP=${WARMUP}"
+cd "$PBS_O_WORKDIR"
+
+export HDF5_USE_FILE_LOCKING=FALSE
+export TMPDIR=/tmp/benchmark_${PBS_JOBID}
+mkdir -p "$TMPDIR"
+
+module load tools singularity/4.3.0
+module use /home/projects/dtu_00074/apps/modulefiles
+module load maat-container-loader
+
+singularity exec \
+  --bind "${WORK_DIR}:/mnt/work" \
+  --bind "${SURROGATE_ROOT}:/mnt/surrogate" \
+  --bind /home/projects/dtu_00074/data/MAAT:/mnt/raid1/MAAT \
+  "$MAAT_SIF" bash -lc '
+    set -euo pipefail
+    cd /mnt/surrogate
+
+    export PYTHONPATH=/mnt/project:/mnt/surrogate:${PYTHONPATH:-}
+    export TMPDIR=/tmp/benchmark_${PBS_JOBID}
+    mkdir -p "$TMPDIR"
+    export HYDRA_FULL_ERROR=1
+
+    python /mnt/surrogate/src/benchmark_surrogate_vs_simulation.py \
+      --driver-dir /mnt/work \
+      --config-path /mnt/surrogate/configs/overall_surrogate \
+      --config-name '"$CONFIG_NAME"' \
+      --steps '"$STEPS"' \
+      --warmup '"$WARMUP"' \
+      --out /mnt/surrogate/results/tables/surrogate_timing_${PBS_JOBID}
+  '

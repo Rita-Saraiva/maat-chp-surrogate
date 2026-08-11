@@ -1,0 +1,78 @@
+#!/bin/bash
+#PBS -W group_list=dtu_00074
+#PBS -A dtu_00074
+#PBS -N analyze_dataset
+#PBS -l nodes=1:ppn=4
+#PBS -l mem=48gb
+#PBS -l walltime=02:00:00
+#PBS -o logs/analysis/analyze_${DATASET}_$PBS_JOBID.out
+#PBS -j oe
+
+set -Eeuo pipefail
+
+PROJECT_ROOT="${PROJECT_ROOT:-/home/projects/dtu_00074/scratch/ritsar_code/Surrogate}"
+SIF="${SIF:-/home/projects/dtu_00074/apps/singularity_images/maat.sif}"
+JOB_ID="${PBS_JOBID:-local}"
+
+trap 'status=$?; printf "ERROR: command failed at line %s with exit status %s\n" "${LINENO}" "${status}"; exit "${status}"' ERR
+
+: "${DATASET:?DATASET is required}"
+
+# Zones are optional; when empty the per-zone series plots are skipped.
+# Override at submit time, e.g. qsub -v DATASET,ZONES=102611,102723 ...
+ZONES="${ZONES:-102611,102723,102141,103243,102411}"
+SPLITS="${SPLITS:-train,val,test}"
+
+mkdir -p "${PROJECT_ROOT}/logs/analysis"
+
+printf '\n============================================================\n'
+printf 'Started: %s\n' "$(date)"
+printf 'Job ID: %s\n' "${JOB_ID}"
+printf 'Host: %s\n' "$(hostname)"
+printf 'Analyze: DATASET=%s SPLITS=%s ZONES=%s\n' "${DATASET}" "${SPLITS}" "${ZONES}"
+printf '============================================================\n'
+
+cd "${PROJECT_ROOT}"
+module load tools singularity/4.3.0
+
+unset PYTHONPATH PYTHONHOME PYTHONUSERBASE
+unset SINGULARITY_BIND SINGULARITY_BINDPATH APPTAINER_BIND APPTAINER_BINDPATH
+
+# Forward a host variable into the container (Singularity strips the prefix).
+fwd()     { export "SINGULARITYENV_$1=${!1}"; }
+fwd_opt() { [ -n "${!1:-}" ] && fwd "$1" || true; }
+
+# CPU-only: pin BLAS/OpenMP to the reserved cores inside the container.
+CPU_THREADS="${CPU_THREADS:-4}"
+for lib in OMP MKL OPENBLAS NUMEXPR; do
+  export "SINGULARITYENV_${lib}_NUM_THREADS=${CPU_THREADS}"
+done
+
+# Fixed container paths / interpreter settings.
+export SINGULARITYENV_PROJECT_ROOT=/mnt/project
+export SINGULARITYENV_OUTPUT_ROOT=/mnt/project
+export SINGULARITYENV_PYTHONPATH=/mnt/project:/mnt/project/.python_deps
+export SINGULARITYENV_PYTHONNOUSERSITE=1
+export SINGULARITYENV_PYTHONUNBUFFERED=1
+export SINGULARITYENV_MPLBACKEND=Agg
+
+# Run configuration forwarded into the container.
+for v in DATASET SPLITS ZONES; do
+  fwd "$v"
+done
+export SINGULARITYENV_PBS_JOBID="${JOB_ID}"
+
+# Optional overrides, forwarded only when provided.
+for v in MAX_SAMPLES MAX_SHARDS HIST_BINS MAX_SCATTER_POINTS MODE_DECIMALS SEED; do
+  fwd_opt "$v"
+done
+
+printf 'Starting dataset analysis\n'
+singularity exec \
+  --cleanenv \
+  --pwd /mnt/project \
+  --bind "${PROJECT_ROOT}:/mnt/project" \
+  "${SIF}" \
+  python -u -m src.analyze_dataset
+
+printf 'Finished successfully: %s\n' "$(date)"
